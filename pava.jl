@@ -176,7 +176,7 @@ end
 outpdb = outpdb * ".pdb"
 
 # Check --top argument is actually bigger than step size
-if top <= resolution
+if top < resolution
     throw(ArgumentError(string("\n\n --top argument ", top," is smaller/equal
 than --resolution argument ", resolution)))
 end
@@ -252,14 +252,26 @@ end
 # Finalmente, hago el script. Esto va p/ casos en los q haga 1 solo
 # desplazamiento
 if script == true
-   load = "cmd.load(\""
-   f = open("script_porky.py", "w")
-   write(f, "from pymol.cgo import *\n")
-   write(f, "from pymol import cmd\n\n")
-   write(f, load, in_pdb_filename,"\")\n")
-   write(f, load, string(cnt, "_", outpdb),"\")\n")
-   write(f, load,"modevectors.py\")\n")
-   write(f, "modevectors(\"", in_pdb_filename[1:end-4], "\", \"", outpdb[1:end-4], "\", ")
-   write(f, "outname=\"modevectors\", head=1.0, tail = 0.3, headrgb = \"1.0, 1.0, 0.0\", tailrgb = \"1.0, 1.0, 0.0\") ")
-   close(f)
+	f = open("script_porky.py", "w")
+	load = "cmd.load(\""
+
+	write(f, "from pymol.cgo import *\n")
+    write(f, "from pymol import cmd\n\n")
+
+	write(f, "cmd.set(\"cartoon_fancy_helices\", 1)\n")
+	write(f, "cmd.set(\"cartoon_transparency\", 0.5)\n")
+    write(f, "cmd.set(\"ray_trace_mode\",  1)\n")
+    write(f, "cmd.set(\"two_sided_lighting\", \"on\")\n")
+    write(f, "cmd.set(\"reflect\", 0)\n")
+    write(f, "cmd.set(\"ambient\", 0.5)\n")
+    write(f, "cmd.set(\"ray_trace_mode\",  0)\n")
+    write(f, "cmd.set('''ray_opaque_background''', '''off''')\n")
+	
+	write(f, load, in_pdb_filename,"\")\n")
+	write(f, load, string(cnt, "_", outpdb),"\")\n")
+	write(f, load,"modevectors.py\")\n")
+	write(f, "modevectors(\"", in_pdb_filename[1:end-4], "\", \"", string(cnt, "_", outpdb)[1:end-4], "\", ")
+	write(f, "outname=\"modevectors\", head=1.0, tail = 0.3, cut=0.5, headrgb = \"1.0, 1.0, 0.0\", tailrgb = \"1.0, 1.0, 0.0\") ")
+
+	close(f)
 end
