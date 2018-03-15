@@ -28,7 +28,7 @@ using ArgParse
 # functions
 ##########
 function read_ptraj_modes(file, modes_elements, norma::Bool=true)
-    modes_file=open(file, "r")
+    modes_file = open(file, "r")
     modes_text = readdlm(modes_file, skipstart=0, skipblanks=true,
     ignore_invalid_chars=true, comments=true, comment_char='\*')
     close(modes_file)
@@ -38,14 +38,14 @@ function read_ptraj_modes(file, modes_elements, norma::Bool=true)
     lines = ceil(Int64, ncoords/7)
     rest = convert(Int64, ncoords % 7)
 
-    eval=Array{Float64}(nmodes);
+    eval = Array{Float64}(nmodes);
     mode = Array{Float64}(ncoords, nmodes);
-    temp1=Array{Float64}(ncoords, 1);
+    temp1 = Array{Float64}(ncoords, 1);
     temp2 = Array{Float64}(ncoords+(7-rest));
 
-    j=lines + 1 + 2 # 1 p/ q lea la prox linea 2 por el header
+    j = lines + 1 + 2 # 1 p/ q lea la prox linea 2 por el header
 
-    for i=1:nmodes
+    for i = 1:nmodes
         eval[i] = modes_text[j, 2]
         temp = transpose(modes_text[(j+1):(lines+j), :])
         temp2 = reshape(temp, ncoords+(7-rest))
@@ -90,7 +90,8 @@ function displaceAA(mod_pdb, in_vector, multiplier)
    	for i = 1:aa
 		rango = Array{Int64}(natom[i])
     	if i == 1
-			sum_mat[1:natom[i], :] = repmat(transpose(vector[i, :]), natom[i], 1)
+			sum_mat[1:natom[i], :] = repmat(transpose(vector[i, :]),
+				natom[i], 1)
 			cursor = natom[i]
 			continue
 		end
@@ -113,7 +114,7 @@ function displaceAtoms(mod_pdb, vector1, multiplier)
     vector = Array{Float64}(1, 3)
 
     # Adapto el vector p/ darle la misma forma q la matriz de coordenadas
-    for i=1:3:length(vector1)
+    for i = 1:3:length(vector1)
         if i== 1
             vector = reshape(vector1[i:i+2], 1, 3)
             continue
@@ -198,10 +199,12 @@ in_vec = Array{Float64}
 if parsed_args["index"] != 0
 # Vector de PCA Amber
     try
-        in_vec = read_ptraj_modes(vector_filename, nres_xyz, true)[1][:, index]
+        in_vec = read_ptraj_modes(vector_filename,
+			nres_xyz, true)[1][:, index]
     catch
         try
-            in_vec = read_ptraj_modes(vector_filename, natom_xyz, true)[1][:, index]
+            in_vec = read_ptraj_modes(vector_filename,
+				natom_xyz, true)[1][:, index]
         end
     end
 else
@@ -211,7 +214,7 @@ end
 
 # In case input vector file is note found
 if in_vec == Array{Float64, 1}
-    throw(ArgumentError(string("\n\n", vector_filename, message_vec_not_found)))
+    error(ArgumentError(string("\n\n", vector_filename, message_vec_not_found)))
 end
 
 # Ahora desplazo
@@ -257,6 +260,6 @@ if script == true
    write(f, load, string(cnt, "_", outpdb),"\")\n")
    write(f, load,"modevectors.py\")\n")
    write(f, "modevectors(\"", in_pdb_filename[1:end-4], "\", \"", outpdb[1:end-4], "\", ")
-   write(f, "outname=\"modevectors\", head=1.0, tail=0.3, headrgb = \"1.0, 1.0, 0.0\", tailrgb = \"1.0, 1.0, 0.0\") ")
+   write(f, "outname=\"modevectors\", head=1.0, tail = 0.3, headrgb = \"1.0, 1.0, 0.0\", tailrgb = \"1.0, 1.0, 0.0\") ")
    close(f)
 end
