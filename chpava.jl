@@ -20,9 +20,7 @@
 #          /,_|  |   /,_/   /
 #             /,_/      '`-'
 ###############################################################################
-using DataFrames
-using MIToS.PDB
-using Distributions
+using Chemfiles
 using ArgParse
 ##########
 # functions
@@ -65,45 +63,52 @@ function read_ptraj_modes(file, modes_elements, norma::Bool=true)
     return mode, eval
 end
 #########
-function displaceAA(mod_pdb, in_vector, multiplier)
-	# Preparo variables
-    pdb = copy(mod_pdb)
-    struct_xyz = coordinatesmatrix(pdb)
-    new_struct_xyz = copy(struct_xyz)
-   	aa = length(pdb)
-	# Determino el nro de atomos de c/ aminoácido
-	natom = Array{Int64}(aa)
-	[ natom[i] = length(pdb[i]) for i = 1:aa ]
+function displaceAA(in_frm, in_vec, step)
+    # Preparo variables
+    in_top = Topology(in_frm)
+    aa = convert(Int64, count_residues(in_top))
+    aa_3 = aa * 3
+    natoms = convert(Int64, size(in_top))
+    in_xyz = positions(in_frm)
+
+	# Determino orden de residuos (hay q actualizar el Julia Chemfiles)
+    tmp = Array{Int64}(aa)
+    ids = Array{Int64}(aa)
+    [ ids[i+1] = convert(Int64, id((Residue(in_top, i)))) for i = 0:aa-1 ]
+    idx = sortperm(ids)
+    # Determino el nro de atomos de c/ aminoácido
+    [ tmp[i+1] = size(Residue(in_top, i)) for i = 0:aa-1 ]
+    natom_aa = tmp[idx]
+
   	# Adapto el vector p/ darle la misma forma q la matriz de coordenadas
 	vector = Array{Float64}
-	const tmp_size = size(in_vector)
+	tmp_size = size(in_vec)[1]
 
-	if tmp_size == (aa*3, 1)
-		vector = transpose(reshape(in_vector, 3, aa))
-	elseif tmp_size == (at, 3)
-		vector = in_vector
+	if tmp_size == aa_3
+		vector = transpose(reshape(in_vec, 3, aa))
+	elseif tmp_size == aa
+		vector = in_vec
 	else
-		error("Input vector with wrong dimensions: ", tmp_size, "  ", (aa*3, 1))
+		error("Input vector with wrong dimensions: ", tmp_size, "  ", (aa_3, 1))
 	end
-	sum_mat = Array{Float64}(sum(natom),3)
+
+	sum_mat = Array{Float64}(3, natoms)
 	cursor = 0
    	for i = 1:aa
-		rango = Array{Int64}(natom[i])
+		rango = Array{Int64}(natom_aa[i])
     	if i == 1
-			sum_mat[1:natom[i], :] = repmat(transpose(vector[i, :]),
-				natom[i], 1)
-			cursor = natom[i]
+			sum_mat[:, 1:natom_aa[i]] = repmat(vector[1, :], 1, natom_aa[i])
+			cursor = natom_aa[i]
 			continue
 		end
-		rango = collect(cursor+1:cursor + natom[i])
-		sum_mat[rango, :] = repmat(transpose(vector[i, :]), natom[i], 1)
-		cursor += natom[i]
+		rango = collect(cursor+1:cursor + natom_aa[i])
+        sum_mat[:, rango] = repmat(vector[1, :], 1, natom_aa[i])
+		cursor += natom_aa[i]
 	end
 
    # Listo, ahora puedo mover el pdb
-   new_struct_xyz  = struct_xyz + sum_mat .* multiplier
-   pdb = change_coordinates(pdb, new_struct_xyz);
-   return pdb
+   out_xyz  = in_xyz + sum_mat .* step
+   return out_xyz
 end
 #########
 function displaceAtoms(mod_pdb, vector1, multiplier)
@@ -148,7 +153,7 @@ s = ArgParseSettings()
 determines the number of output structures "
         arg_type = Float64
         required = true
-    "--outpdb", "-o"
+    "--out_pdb_filename", "-o"
         help = "Output PDBs suffix"
         arg_type = String
         required = true
@@ -173,7 +178,7 @@ for (arg, val) in parsed_args
     @eval (($arg) = ($val))
 end
 # Append ".pdb" to output pdb
-outpdb = outpdb * ".pdb"
+out_pdb_filename = out_pdb_filename * ".pdb"
 
 # Check --top argument is actually bigger than step size
 if top < resolution
@@ -186,21 +191,24 @@ println("INPDB          ", in_pdb_filename)
 println("VECTOR         ", vector_filename)
 println("TOP            ", top)
 println("RESOLUTION     ", resolution)
-println("OUTPDB         ", outpdb)
+println("out_pdb_filename         ", out_pdb_filename)
 println("INDEX          ", parsed_args["index"])
 println("script?        ", script)
 
 # Read PDB
-in_pdb = read(string(in_pdb_filename), PDBFile, group="ATOM");
-nres_xyz = 3*length(in_pdb)
-natom_xyz = size(coordinatesmatrix(in_pdb))[1] * 3
+const in_trj = Trajectory(in_pdb_filename)
+const in_frm = read(in_trj)
+const in_xyz = positions(in_frm)
+const aa = convert(Int64, count_residues(in_top))
+const aa_3 = aa * 3
+const natoms = convert(Int64, size(in_top))
 
 in_vec = Array{Float64}
 if parsed_args["index"] != 0
 # Vector de PCA Amber
     try
         in_vec = read_ptraj_modes(vector_filename,
-			nres_xyz, true)[1][:, index]
+			aa_3, true)[1][:, index]
     catch
         try
             in_vec = read_ptraj_modes(vector_filename,
@@ -219,25 +227,28 @@ end
 
 # Ahora desplazo
 cnt = 0
-if nres_xyz == length(in_vec)
+if aa_3 == length(in_vec)
 # El modo es de Calpha y está ordenado en una columna
     in_vec = in_vec / norm(in_vec)
     for step in -top:resolution:top
-        out_pdb = displaceAA(in_pdb, in_vec, step);
-        # Y guardo
         cnt+=1
-        out_filename = string(cnt, "_", outpdb)
-        write(out_filename, out_pdb, PDBFile)
+		out_filename = string(cnt, "_", out_pdb_filename)
+		out_trj = Trajectory(out_filename, 'w')
+		out_frm = deepcopy(in_frm)
+		out_xyz = positions(out_frm)
+		out_xyz = displaceAA(in_xyz, in_vec, step);
+		# Y guardo
+        write(out_trj, out_frm)
     end
 elseif natom_xyz == length(in_vec)
 # El modo es all-atom
     in_vec = in_vec / norm(in_vec)
 
     for step in -top:resolution:top
-        out_pdb = displaceAtoms(in_pdb, in_vec, step);
+        out_pdb = displaceAtoms(in_xyz, in_vec, step);
         # Y guardo
         cnt+=1
-        out_filename = string(cnt, "_", outpdb)
+        out_filename = string(cnt, "_", out_pdb_filename)
         write(out_filename, out_pdb, PDBFile)
     end
 
@@ -260,18 +271,17 @@ if script == true
 
 	write(f, "cmd.set(\"cartoon_fancy_helices\", 1)\n")
 	write(f, "cmd.set(\"cartoon_transparency\", 0.5)\n")
-    write(f, "cmd.set(\"ray_trace_mode\",  1)\n")
     write(f, "cmd.set(\"two_sided_lighting\", \"on\")\n")
     write(f, "cmd.set(\"reflect\", 0)\n")
     write(f, "cmd.set(\"ambient\", 0.5)\n")
     write(f, "cmd.set(\"ray_trace_mode\",  0)\n")
     write(f, "cmd.set('''ray_opaque_background''', '''off''')\n")
-	
+
 	write(f, load, in_pdb_filename,"\")\n")
-	write(f, load, string(cnt, "_", outpdb),"\")\n")
+	write(f, load, string(cnt, "_", out_pdb_filename),"\")\n")
 	write(f, load,"modevectors.py\")\n")
-	write(f, "modevectors(\"", in_pdb_filename[1:end-4], "\", \"", string(cnt, "_", outpdb)[1:end-4], "\", ")
-	write(f, "outname=\"modevectors\", head=1.0, tail = 0.3, cut=0.5, headrgb = \"1.0, 1.0, 0.0\", tailrgb = \"1.0, 1.0, 0.0\") ")
+	write(f, "modevectors(\"", in_pdb_filename[1:end-4], "\", \"", string(cnt, "_", out_pdb_filename)[1:end-4], "\", ")
+	write(f, "outname=\"modevectors\", head=0.5, tail = 0.3, cut=0.5, headrgb = \"1.0, 1.0, 0.0\", tailrgb = \"1.0, 1.0, 0.0\") ")
 
 	close(f)
 end
