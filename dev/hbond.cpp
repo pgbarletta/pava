@@ -45,9 +45,9 @@ int main(int argc, char *argv[]) {
   auto ite = atomo.properties_begin();
   auto ult = atomo.properties_end();
 
-  for (ite; ite != ult; ++ite) {
-    std::cout << ite->first << "  " << ite->second.as_double() << '\n';
-  }
+  // for (ite; ite != ult; ++ite) {
+  //   std::cout << ite->first << "  " << ite->second.as_double() << '\n';
+  // }
 
   const int count = std::stoi(argv[2]);
   std::cout << "count:  " << count << '\n';
