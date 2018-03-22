@@ -77,10 +77,11 @@ function displaceAA(mod_pdb, in_vector, multiplier)
   	# Adapto el vector p/ darle la misma forma q la matriz de coordenadas
 	vector = Array{Float64}
 	const tmp_size = size(in_vector)
+        const natoms = sum(natom)
 
 	if tmp_size == (aa*3, 1)
 		vector = transpose(reshape(in_vector, 3, aa))
-	elseif tmp_size == (at, 3)
+	elseif tmp_size == (natoms, 3)
 		vector = in_vector
 	else
 		error("Input vector with wrong dimensions: ", tmp_size, "  ", (aa*3, 1))
