@@ -1,4 +1,4 @@
-#!/home/german/julia4/bin/julia
+#!/usr/bin/env julia
 ###############################################################################
 # utility to displace a PDB along a vector, generating several PDBs
 ###############################################################################
