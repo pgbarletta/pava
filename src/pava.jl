@@ -215,7 +215,7 @@ end
 
 # In case input vector file is note found
 if in_vec == Array{Float64, 1}
-    error(ArgumentError(string("\n\n", vector_filename, message_vec_not_found)))
+    error(ArgumentError(string("\n\n", vector_filename, " was not found.")))
 end
 
 # Ahora desplazo
